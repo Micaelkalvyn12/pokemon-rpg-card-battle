@@ -66,6 +66,8 @@ export async function seedCards(){
   // Migração segura e repetível: garante as cartas padrão e repara índices
   // de arte ausentes mesmo em navegadores que já tenham um marcador antigo.
   // Não substitui imagens próprias nem atributos personalizados do jogador.
+  const artMarker = await transaction('meta','readonly',s=>s.get('pdf-card-art-v2'));
+  const addMissingDefaults = !artMarker;
   const existing = await getCards();
   const byId = new Map(existing.map(card=>[String(card.id),card]));
   const legacyHp = {'4':58,'10':68,'18':61,'25':68,'41':63};
@@ -76,7 +78,7 @@ export async function seedCards(){
     DEFAULT_CARDS.forEach(def=>{
       const old=byId.get(String(def.id));
       if(!old){
-        store.put(def);
+        if(addMissingDefaults) store.put(def);
         return;
       }
       const updated={...old};
