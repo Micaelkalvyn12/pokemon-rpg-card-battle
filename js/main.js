@@ -1,5 +1,5 @@
 import { seedCards, getCards, saveCard, removeCard, importCards, exportCards } from './database.js';
-import { createMatch, currentPlayer, executeAttack, advanceTurn, livingOpponents, checkFinished } from './combat-system.js';
+import { createMatch, currentPlayer, executeAttack, advanceTurn, livingOpponents, checkFinished, submitAction, allActionsSubmitted, getResolutionOrder, getPlayer, getPokemonSpeed } from './combat-system.js';
 import { chooseAIMove } from './ai.js';
 import { audio } from './audio.js';
 
@@ -8,7 +8,7 @@ const modalRoot=document.getElementById('modal-root');
 const toastRegion=document.getElementById('toast-region');
 const ADMIN_PASSWORD='PokemonRPG'; // Barreira local de interface; não é autenticação segura para hospedagem pública.
 const TYPES=['Normal','Fogo','Água','Elétrico','Planta','Gelo','Lutador','Veneno','Terra','Voador','Psíquico','Inseto','Pedra','Fantasma','Dragão','Sombrio','Aço','Fada'];
-const state={view:'home',cards:[],setupMode:null,participants:[],selectionIndex:0,pendingCardId:null,match:null,selectedTargetId:null,turnMask:false,adminUnlocked:false,adminFormOpen:false,editingId:null,pendingImage:null,adminSearch:'',adminType:'',difficulty:'medio',sound:true,battleFx:null,victoryPlayed:false};
+const state={view:'home',cards:[],setupMode:null,participants:[],selectionIndex:0,pendingCardId:null,match:null,selectedTargetId:null,turnMask:false,resolving:false,currentActorId:null,adminUnlocked:false,adminFormOpen:false,editingId:null,pendingImage:null,adminSearch:'',adminType:'',difficulty:'medio',sound:true,battleFx:null,victoryPlayed:false};
 
 function esc(value=''){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
@@ -29,6 +29,8 @@ function cardImage(card,large=false,battle=false){
   if(card.spriteIndex!==undefined&&spritePosition(card,battle))return `<div class="card-sprite ${battle?'battle-sprite':''} ${large?'large':''}" style="${spritePosition(card,battle)}" role="img" aria-label="${esc(card.name)}"></div>`;
   return `<span class="card-placeholder">${initials(card.name)}</span>`;
 }
+function hasArtwork(card){return Boolean(safeImage(card)||spritePosition(card));}
+function availableCards(){return state.cards.filter(hasArtwork);}
 function findCard(id){return state.cards.find(c=>String(c.id)===String(id));}
 function updateCards(){return getCards().then(cards=>{state.cards=cards;});}
 function typeOptions(current=''){return `<option value="">Nenhum</option>`+TYPES.map(t=>`<option value="${t}" ${t===current?'selected':''}>${t}</option>`).join('');}
@@ -60,9 +62,9 @@ function renderHome(){return `
   <section class="collection-showcase">
     <div class="collection-showcase-heading">
       <div><span class="eyebrow">ARTES DAS CARTAS</span><h2>COLEÇÃO ILUSTRADA</h2><p>As ilustrações das cartas fazem parte da seleção de Pokémon e da arena de batalha.</p></div>
-      <span class="collection-count">${state.cards.filter(c=>c.spriteIndex!==undefined).length} artes vinculadas</span>
+      <span class="collection-count">${availableCards().length} artes vinculadas</span>
     </div>
-    <div class="collection-art-grid">${state.cards.filter(c=>c.spriteIndex!==undefined).slice(0,4).map(c=>'<article class="collection-art-card"><div class="collection-art-image">'+cardImage(c,true)+'</div><div class="collection-art-caption"><strong>'+esc(c.name)+'</strong><span>'+typeChips(c)+'</span></div></article>').join('')}</div>
+    <div class="collection-art-grid">${availableCards().slice(0,4).map(c=>'<article class="collection-art-card"><div class="collection-art-image">'+cardImage(c,true)+'</div><div class="collection-art-caption"><strong>'+esc(c.name)+'</strong><span>'+typeChips(c)+'</span></div></article>').join('')}</div>
   </section>
   <section class="panel home-bottom"><div><strong>✦ Biblioteca de cartas</strong><br><span>${state.cards.length} Pokémon disponíveis · imagens e atributos editáveis</span></div><div><button class="btn btn-secondary" data-action="open-admin">⚙ GERENCIAR CARTAS</button></div></section>
   `;}
@@ -98,8 +100,8 @@ function renderSelection(){
   const participant=currentSelector();const chosen=state.pendingCardId?findCard(state.pendingCardId):null;
   const aiCount=state.participants.filter(p=>p.isAI).length;
   return `<div class="page-heading"><div><span class="eyebrow">ETAPA 02 · ESCOLHA DO TIME</span><h1>SELECIONE SEU POKÉMON</h1><p>${participant?`Vez de <b>${esc(participant.name)}</b> — Equipe ${participant.team}.`:'Todos os treinadores já escolheram.'} ${aiCount?'A IA receberá um Pokémon automaticamente.':''}</p></div><button class="btn btn-ghost" data-action="home">← Sair</button></div>
-  <div class="selection-layout"><section><div class="filter-bar"><input id="selection-search" placeholder="Pesquisar Pokémon..." aria-label="Pesquisar Pokémon"><select id="selection-type"><option value="">Todos os tipos</option>${TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div><div class="card-grid" id="selection-grid">${state.cards.map(c=>renderCard(c,chosen?.id===c.id)).join('')}</div></section>
-  <aside class="panel selection-side"><span class="eyebrow">ESCOLHA ATUAL</span><h3>${participant?esc(participant.name):'Seleção concluída'}</h3><div class="selection-preview">${chosen?cardImage(chosen,true):'<span class="muted">Selecione uma carta</span>'}</div>${chosen?`<strong>${esc(chosen.name)}</strong><div class="type-row" style="padding:8px 0">${typeChips(chosen)}</div><div class="stat-line"><span>Vida máxima</span><b>${chosen.hp} HP</b></div><div class="attack-mini"><span>${esc(chosen.attacks[0].name)}</span><b>${chosen.attacks[0].damage}</b></div><div class="attack-mini"><span>${esc(chosen.attacks[1].name)}</span><b>${chosen.attacks[1].damage}</b></div>`:'<p class="select-hint">Clique em uma carta para ver os detalhes e confirmar sua escolha.</p>'}
+  <div class="selection-layout"><section><div class="filter-bar"><input id="selection-search" placeholder="Pesquisar Pokémon..." aria-label="Pesquisar Pokémon"><select id="selection-type"><option value="">Todos os tipos</option>${TYPES.map(t=>`<option>${t}</option>`).join('')}</select></div><div class="card-grid" id="selection-grid">${availableCards().map(c=>renderCard(c,chosen?.id===c.id)).join('')||'<div class="empty-state" style="grid-column:1/-1">Nenhum Pokémon com imagem disponível foi encontrado.</div>'}</div></section>
+  <aside class="panel selection-side"><span class="eyebrow">ESCOLHA ATUAL</span><h3>${participant?esc(participant.name):'Seleção concluída'}</h3><div class="selection-preview">${chosen?cardImage(chosen,true):'<span class="muted">Selecione uma carta</span>'}</div>${chosen?`<strong>${esc(chosen.name)}</strong><div class="type-row" style="padding:8px 0">${typeChips(chosen)}</div><div class="stat-line"><span>Vida máxima</span><b>${chosen.hp} HP</b></div><div class="stat-line"><span>Velocidade</span><b>${getPokemonSpeed(chosen)}</b></div><div class="attack-mini"><span>${esc(chosen.attacks[0].name)}</span><b>${chosen.attacks[0].damage}</b></div><div class="attack-mini"><span>${esc(chosen.attacks[1].name)}</span><b>${chosen.attacks[1].damage}</b></div>`:'<p class="select-hint">Clique em uma carta para ver os detalhes e confirmar sua escolha.</p>'}
   <button class="btn btn-primary" data-action="confirm-selection" ${!chosen||!participant?'disabled':''}>${state.selectionIndex>=state.participants.filter(p=>!p.isAI).length-1?'CONFIRMAR E INICIAR':'CONFIRMAR ESCOLHA'}</button><button class="btn btn-ghost" data-action="cancel-selection">Voltar</button><p class="select-hint">${state.selectionIndex+1} de ${state.participants.filter(p=>!p.isAI).length} escolhas humanas</p></aside></div>`;
 }
 function renderCombatant(player,enemy=false){
@@ -107,7 +109,7 @@ function renderCombatant(player,enemy=false){
   const effects=[...player.statuses.map(s=>({label:s.type==='poison'?'☠ Veneno':s.type==='burn'?'🔥 Queimadura':'⚡ Paralisia',cls:''})),...(player.shield?[{label:`🛡 Escudo ${player.shield}`,cls:'shield'}]:[]),...player.buffs.map(b=>({label:b.type==='reflect'?'↩ Reflexão':b.type==='reduce'?`🛡 Redução ${b.amount}`:b.type==='bonus'?`✦ +${b.amount} próximo golpe`:'Efeito',cls:'shield'}))];
   const fx=state.battleFx;
   const fxClass=fx?`${fx.attackerId===player.id?'fx-attacker':''} ${fx.targetId===player.id?'fx-target':''}`:'';
-  return `<div class="combatant ${enemy?'enemy':''} ${player.id===state.match.currentPlayerId?'active':''} ${fxClass}"><div class="combatant-head"><div><strong>${esc(player.card.name)}</strong><small>${esc(player.name)} · EQUIPE ${player.team}</small></div><span class="tag">${player.fainted?'DERROTADO':player.isAI?'IA':'JOGADOR'}</span></div><div class="combat-art">${cardImage(player.card,true,true)}</div><div class="type-row" style="padding:0">${typeChips(player.card)}</div>
+  return `<div class="combatant ${enemy?'enemy':''} ${player.id===state.currentActorId?'active':''} ${fxClass}"><div class="combatant-head"><div><strong>${esc(player.card.name)}</strong><small>${esc(player.name)} · EQUIPE ${player.team}</small></div><span class="tag">${player.fainted?'DERROTADO':player.isAI?'IA':'JOGADOR'}</span></div><div class="combat-art">${cardImage(player.card,true,true)}</div><div class="type-row" style="padding:0">${typeChips(player.card)}</div>
   <div class="stat-line"><span>VIDA</span><b>${player.hp} / ${player.card.hp}</b></div><div class="bar"><span class="hp-fill" style="width:${hpPct}%"></span></div>
   <div class="stat-line"><span>MANA</span><b>${player.mana} / 20</b></div><div class="bar"><span class="mana-fill" style="width:${manaPct}%"></span></div>
   ${effects.length?`<div class="effects-row">${effects.map(e=>`<span class="effect-pill ${e.cls}">${esc(e.label)}</span>`).join('')}</div>`:''}</div>`;
@@ -117,20 +119,41 @@ function renderTeamBoard(match){
   return `<div class="team-board"><div><h4>◈ EQUIPE A</h4>${match.players.filter(p=>p.team==='A').map(p=>`<div class="team-member ${p.fainted?'out':''}">${esc(p.name)} · ${esc(p.card.name)} — ${p.fainted?'Derrotado':`${p.hp} HP`}</div>`).join('')}</div><div><h4 style="color:#d4b1ff">◈ EQUIPE B</h4>${match.players.filter(p=>p.team==='B').map(p=>`<div class="team-member ${p.fainted?'out':''}">${esc(p.name)} · ${esc(p.card.name)} — ${p.fainted?'Derrotado':`${p.hp} HP`}</div>`).join('')}</div></div>`;
 }
 function renderBattle(){
-  const match=state.match;if(!match)return renderHome();
-  if(match.finished){if(!state.victoryPlayed){audio.play('victory');state.victoryPlayed=true;}const winner=match.players.find(p=>p.team===match.winnerTeam);const winners=match.players.filter(p=>p.team===match.winnerTeam);return `<section class="panel winner-panel"><div class="trophy">🏆</div><span class="eyebrow">FIM DE BATALHA</span><h2>${match.players.length===2?`VITÓRIA DE ${esc(winners[0]?.name||'TREINADOR')}`:`VITÓRIA DA EQUIPE ${match.winnerTeam}`}</h2><p class="muted">${winners.map(p=>esc(p.name)).join(', ')} venceu${winners.length>1?'ram':''} a partida!</p><div class="divider"></div><div class="team-board"><div><h4>RESULTADO</h4>${match.players.map(p=>`<div class="team-member">${esc(p.name)} · ${esc(p.card.name)}<br><span class="muted">${p.fainted?'Derrotado':`${p.hp} HP restantes`} · ${p.damageDealt} dano causado</span></div>`).join('')}</div><div><h4>RESUMO</h4><div class="team-member">Turnos realizados: ${match.turn}</div><div class="team-member">Registros de combate: ${match.log.length}</div><div class="team-member">Modo: ${match.mode==='1vsIA'?'1 VS IA':match.mode==='team'?'Batalha em equipe':'1 VS 1'}</div></div></div><div class="battle-actions" style="justify-content:center"><button class="btn btn-primary" data-action="replay">JOGAR NOVAMENTE</button><button class="btn btn-secondary" data-action="home">MENU INICIAL</button></div></section>`;}
-  const player=currentPlayer(match);const opponents=livingOpponents(match,player);const target=opponents.find(p=>p.id===state.selectedTargetId)||opponents[0];if(target)state.selectedTargetId=target.id;
-  const moves=player.card.attacks||[];
-  const fx=state.battleFx;
-  return `<div class="battle-top"><div><span class="eyebrow">ARENA DE BATALHA · TURNO ${match.turn}</span><h1 class="hero-title" style="font-size:39px;margin-top:5px">${match.mode==='team'?'BATALHA EM EQUIPE':match.mode==='1vsIA'?'DESAFIO VS IA':'DUELO 1 VS 1'}</h1></div><span class="battle-status">● TURNO DE ${esc(player.name).toUpperCase()}</span></div>
-  <section class="battle-arena battle-stage ${fx?`fx-${esc(fx.kind)}`:''}"><div class="arena-lights"></div><div class="battlefield-title"><span>CAMPO DE BATALHA</span><b>TURNO ${match.turn}</b></div><div class="combatants">${renderCombatant(player,false)}${renderCombatant(target,true)}</div><div class="arena-vs">VS</div>${fx?`<div class="battle-fx-label">${esc(fx.label)}</div>`:''}</section>
-  ${renderTeamBoard(match)}
-  <section class="battle-lower"><div class="panel battle-controls"><span class="eyebrow">SUA JOGADA</span><h3>${esc(player.name)} — ${esc(player.card.name)}</h3><p>${player.isAI?'A inteligência artificial está escolhendo uma jogada.':'Escolha um ataque. Você pode executar um ataque por turno.'}</p>
-    ${opponents.length>1?`<div class="field" style="margin-bottom:12px"><label>Escolher alvo</label><select id="target-select">${opponents.map(p=>`<option value="${p.id}" ${p.id===target?.id?'selected':''}>${esc(p.name)} — ${esc(p.card.name)} (${p.hp} HP)</option>`).join('')}</select></div>`:''}
-    <div class="move-grid">${moves.map((m,i)=>`<button class="move-btn" data-action="attack" data-index="${i}" ${player.isAI||player.mana<m.cost?'disabled':''}><strong>${esc(m.name)}</strong><span class="move-meta"><b>⚔ ${m.damage} DANO</b><span>✦ ${m.cost} MANA</span></span><small>${esc(m.description||'Ataque Pokémon')}</small></button>`).join('')}</div>
-    <div class="battle-actions"><button class="btn btn-ghost btn-small" data-action="surrender">Desistir</button><span class="select-hint">Mana disponível: ${player.mana}/20</span></div></div>
-    <aside class="panel battle-log"><h3>📜 HISTÓRICO DA BATALHA</h3><div class="log-list">${match.log.slice(0,24).map(entry=>`<div class="log-entry ${entry.kind}">${esc(entry.message)}</div>`).join('')}</div></aside></section>
-    ${state.turnMask?`<div class="turn-mask"><div class="panel turn-mask-card"><span class="eyebrow">PASSAGEM DE TURNO</span><h2>VEZ DE ${esc(player.name).toUpperCase()}</h2><p>Entregue o dispositivo para <b>${esc(player.name)}</b>. Quando estiver pronto, revele a batalha e faça sua jogada.</p><button class="btn btn-primary" data-action="turn-ready">ESTOU PRONTO →</button></div></div>`:''}`;
+ const match=state.match;if(!match)return renderHome();
+ if(match.finished){
+  if(!state.victoryPlayed){audio.play('victory');state.victoryPlayed=true;}
+  const winners=match.players.filter(p=>p.team===match.winnerTeam);
+  return `<section class="panel winner-panel"><div class="trophy">🏆</div><span class="eyebrow">FIM DE BATALHA</span><h2>${match.players.length===2?`VITÓRIA DE ${esc(winners[0]?.name||'TREINADOR')}`:`VITÓRIA DA EQUIPE ${match.winnerTeam}`}</h2><p class="muted">${winners.map(p=>esc(p.name)).join(', ')} venceu${winners.length>1?'ram':''} a partida!</p><div class="divider"></div><div class="team-board"><div><h4>RESULTADO</h4>${match.players.map(p=>`<div class="team-member">${esc(p.name)} · ${esc(p.card.name)}<br><span class="muted">${p.fainted?'Derrotado':`${p.hp} HP restantes`} · ${p.damageDealt} dano causado</span></div>`).join('')}</div><div><h4>RESUMO</h4><div class="team-member">Rodadas realizadas: ${match.turn}</div><div class="team-member">Registros de combate: ${match.log.length}</div><div class="team-member">Modo: ${match.mode==='1vsIA'?'1 VS IA':match.mode==='team'?'Batalha em equipe':'1 VS 1'}</div></div></div><div class="battle-actions" style="justify-content:center"><button class="btn btn-primary" data-action="replay">JOGAR NOVAMENTE</button><button class="btn btn-secondary" data-action="home">MENU INICIAL</button></div></section>`;
+ }
+ const planner=currentPlayer(match);
+ const actor=(state.currentActorId&&getPlayer(match,state.currentActorId))||planner||match.players.find(p=>p.team==='A')||match.players[0];
+ const fx=state.battleFx;
+ const targetFromFx=fx?.targetId?getPlayer(match,fx.targetId):null;
+ const opponents=actor?livingOpponents(match,actor):[];
+ const target=targetFromFx||opponents.find(p=>p.id===state.selectedTargetId)||opponents[0]||match.players.find(p=>p.team!==actor?.team)||match.players[1];
+ if(target&&!state.resolving)state.selectedTargetId=target.id;
+ const moves=planner?.card.attacks||[];
+ const submitted=Object.keys(match.roundActions||{}).length;
+ const activeCount=match.players.filter(p=>!p.fainted).length;
+ const status=state.resolving?'RESOLVENDO A RODADA':planner?`ESCOLHA DE ${planner.name.toUpperCase()}`:'AGUARDANDO';
+ const controlTitle=state.resolving?'A velocidade decide a ordem!':planner?`${planner.name} — ${planner.card.name}`:'Aguardando escolhas';
+ const controlText=state.resolving?'Os golpes estão sendo executados do Pokémon mais rápido para o mais lento.':'Escolha seu golpe e seu alvo. Ninguém ataca antes de todos confirmarem.';
+ const plannerOpponents=planner?livingOpponents(match,planner):[];
+ return `<div class="battle-top"><div><span class="eyebrow">ARENA DE BATALHA · RODADA ${match.turn}</span><h1 class="hero-title" style="font-size:39px;margin-top:5px">${match.mode==='team'?'BATALHA EM EQUIPE':match.mode==='1vsIA'?'DESAFIO VS IA':'DUELO 1 VS 1'}</h1></div><span class="battle-status">${esc(status)}</span></div>
+ <section class="battle-arena battle-stage ${fx?`fx-${esc(fx.kind)}`:''}"><div class="arena-lights"></div><div class="battlefield-title"><span>CAMPO DE BATALHA · TODOS ESCOLHEM PRIMEIRO</span><b>RODADA ${match.turn}</b></div>
+ <div class="combatants">${actor?renderCombatant(actor,false):''}${target?renderCombatant(target,true):''}</div><div class="arena-vs">VS</div>
+ ${fx?`<div class="attack-vfx fxv-${esc(fx.kind)} ${fx.attackerId===actor?.id?'from-left':'from-right'}" aria-hidden="true"></div><div class="battle-fx-label">${esc(fx.label)}</div>`:''}
+ ${state.resolving&&fx?`<div class="battle-attack-caption">${esc(fx.attackName||'Ataque')} · ${esc(fx.roll)} / 20 no D20</div>`:''}</section>
+ ${renderTeamBoard(match)}
+ <section class="battle-lower"><div class="panel battle-controls"><span class="eyebrow">${state.resolving?'ORDEM DE INICIATIVA':'FASE DE ESCOLHA'}</span><h3>${esc(controlTitle)}</h3><p>${esc(controlText)}</p>
+ ${state.resolving?`<div class="resolution-card"><div class="resolution-spinner">✦</div><strong>Golpes em sequência</strong><span>${submitted} ações escolhidas · ${activeCount} Pokémon ativos</span><small>O d20 determina a força do golpe quando ele acontece.</small></div>`:
+ planner?`${plannerOpponents.length>1?`<div class="field" style="margin-bottom:12px"><label>Escolher alvo</label><select id="target-select">${plannerOpponents.map(p=>`<option value="${p.id}" ${p.id===target?.id?'selected':''}>${esc(p.name)} — ${esc(p.card.name)} (${p.hp} HP)</option>`).join('')}</select></div>`:''}
+ <div class="move-grid">${moves.map((m,i)=>`<button class="move-btn" data-action="attack" data-index="${i}" ${planner.mana<m.cost?'disabled':''}><strong>${esc(m.name)}</strong><span class="move-meta"><b>⚔ ${m.damage} DANO BASE</b><span>✦ ${m.cost} MANA</span></span><small>${esc(m.description||'Ataque Pokémon')}</small></button>`).join('')}</div>
+ <div class="dice-guide"><span class="dice-icon">D20</span><div><strong>Teste de ataque</strong><small>1–5 fraco · 6–14 normal · 15–19 forte · 20 crítico</small></div></div>
+ <div class="battle-actions"><button class="btn btn-ghost btn-small" data-action="surrender">Desistir</button><span class="select-hint">Mana: ${planner.mana}/20 · Velocidade: ${planner.speed}</span></div>`:
+ `<div class="resolution-card"><strong>Preparando a rodada...</strong><span>${submitted} de ${activeCount} escolhas recebidas</span></div>`}
+ </div><aside class="panel battle-log"><h3>📜 CRÔNICA DA BATALHA</h3><div class="log-list">${match.log.slice(0,24).map(entry=>`<div class="log-entry ${entry.kind}">${esc(entry.message)}</div>`).join('')}</div></aside></section>
+ ${state.turnMask&&planner?`<div class="turn-mask"><div class="panel turn-mask-card"><span class="eyebrow">ESCOLHA SECRETA · JOGADOR ${submitted+1}</span><h2>VEZ DE ${esc(planner.name).toUpperCase()}</h2><p>Entregue o dispositivo para <b>${esc(planner.name)}</b>. As escolhas anteriores ficam ocultas. Depois que todos escolherem, a velocidade define quem ataca primeiro.</p><button class="btn btn-primary" data-action="turn-ready">REVELAR MINHA JOGADA →</button></div></div>`:''}`;
 }
 function renderAdminForm(card=null){
  const value=(key,def='')=>esc(card?.[key]??def);
@@ -140,6 +163,7 @@ function renderAdminForm(card=null){
   <div class="form-section-title">IDENTIFICAÇÃO</div>
   <div class="field"><label>Nome do Pokémon *</label><input name="name" required maxlength="32" value="${value('name')}" placeholder="Ex.: Gyarados"></div>
   <div class="field"><label>Vida máxima *</label><input type="number" name="hp" min="1" max="999" required value="${value('hp','70')}"></div>
+  <div class="field"><label>Velocidade (1–200)</label><input type="number" name="speed" min="1" max="200" value="${value('speed',String(getPokemonSpeed(card||{})))}"></div>
   <div class="field"><label>Tipo primário *</label><select name="type1" required>${TYPES.map(t=>`<option ${t===value('type1','Normal')?'selected':''}>${t}</option>`).join('')}</select></div>
   <div class="field"><label>Tipo secundário</label><select name="type2">${typeOptions(value('type2'))}</select></div>
   <div class="field full"><label>Imagem da carta</label><div class="upload-box"><input type="file" id="image-upload" accept="image/png,image/jpeg,image/webp"><small>PNG, JPG, JPEG ou WEBP. A imagem ficará salva no navegador.</small><div class="upload-preview" id="upload-preview">${image?`<img src="${esc(image)}" alt="Prévia da carta">`:card?cardImage(card,true):'Prévia da imagem aparecerá aqui'}</div></div></div>
@@ -203,66 +227,108 @@ function confirmSelection(){
  if(!p||!card){toast('Escolha um Pokémon antes de continuar.','error');return;}
  audio.play('select');p.card=card;state.selectionIndex=state.participants.findIndex((x,i)=>i>state.selectionIndex&&!x.isAI);
  if(state.selectionIndex===-1){
-  state.participants.filter(x=>x.isAI).forEach(ai=>{const options=state.cards.filter(c=>c.id!==state.participants.find(p=>!p.isAI)?.card?.id);ai.card=options[Math.floor(Math.random()*options.length)]||state.cards[0];});
+  state.participants.filter(x=>x.isAI).forEach(ai=>{const options=availableCards().filter(c=>c.id!==state.participants.find(p=>!p.isAI)?.card?.id);ai.card=options[Math.floor(Math.random()*options.length)]||state.cards[0];});
   startBattle();
  }else{state.pendingCardId=null;render();}
 }
 function startBattle(){
  if(state.participants.some(p=>!p.card)){toast('Todos os jogadores precisam escolher um Pokémon.','error');return;}
- const mode=state.setupMode;state.match=createMatch(state.participants,mode,state.difficulty);state.selectedTargetId=null;state.view='battle';state.turnMask=mode!=='1vsIA';state.battleFx=null;state.victoryPlayed=false;audio.play('start');render();
- if(!state.turnMask) prepareTurn();
+ if(!availableCards().length){toast('Não há Pokémon com imagens disponíveis para iniciar a partida.','error');return;}
+ const mode=state.setupMode;state.match=createMatch(state.participants,mode,state.difficulty);state.selectedTargetId=null;state.view='battle';state.turnMask=mode!=='1vsIA';state.resolving=false;state.currentActorId=null;state.battleFx=null;state.victoryPlayed=false;audio.play('start');render();prepareTurn();
 }
 function prepareTurn(){
- if(!state.match||state.match.finished){render();return;}
- const p=currentPlayer(state.match);
- if(p?.isAI){render();setTimeout(runAI,650);}
- else if(state.match.mode!=='1vsIA' && state.match.players.length>1){state.turnMask=true;render();}
- else render();
+ const match=state.match;if(!match||match.finished||state.resolving)return;
+ for(const ai of match.players.filter(p=>p.isAI&&!p.fainted&&!match.roundActions[p.id])){
+  const choice=chooseAIMove(match,ai,ai.difficulty||state.difficulty);
+  const targets=livingOpponents(match,ai).sort((a,b)=>a.hp-b.hp);
+  if(choice&&targets[0])submitAction(match,ai.id,choice.index,targets[0].id);
+ }
+ if(allActionsSubmitted(match)){state.turnMask=false;resolveQueuedRound();return;}
+ const planner=currentPlayer(match);
+ if(planner){state.turnMask=match.mode!=='1vsIA';render();}
 }
-function runAI(){
- const match=state.match;if(!match||match.finished)return;
- const ai=currentPlayer(match);if(!ai?.isAI)return;
- const choice=chooseAIMove(match,ai,ai.difficulty||state.difficulty);
- const targets=livingOpponents(match,ai).sort((a,b)=>a.hp-b.hp);
- let result=null;
- if(choice&&targets[0]) result=executeAttack(match,ai.id,choice.index,targets[0].id);
- if(result?.ok){playMoveSound(ai,result);state.battleFx={kind:moveFxKind(result),attackerId:result.attacker.id,targetId:result.target.id,label:battleFxLabel(result),key:Date.now()};}
- if(!match.finished) advanceTurn(match);
- state.selectedTargetId=null;render();clearBattleFxLater();if(!match.finished)prepareTurn();
-}
-function playAttack(index){
- const p=currentPlayer(state.match);if(!p)return;
- const result=executeAttack(state.match,p.id,index,state.selectedTargetId);
+function queuePlayerAttack(index){
+ const match=state.match;if(!match||state.resolving)return;
+ const player=currentPlayer(match);if(!player||player.isAI)return;
+ const result=submitAction(match,player.id,index,state.selectedTargetId);
  if(!result.ok){toast(result.message,'error');return;}
- playMoveSound(p,result);state.battleFx={kind:moveFxKind(result),attackerId:result.attacker.id,targetId:result.target.id,label:battleFxLabel(result),key:Date.now()};
- if(!state.match.finished)advanceTurn(state.match);
- state.selectedTargetId=null;render();clearBattleFxLater();if(!state.match.finished)prepareTurn();
+ audio.play('select');
+ if(allActionsSubmitted(match)){state.turnMask=false;resolveQueuedRound();return;}
+ state.selectedTargetId=null;
+ const next=currentPlayer(match);
+ state.turnMask=Boolean(next&&match.mode!=='1vsIA');
+ render();
+}
+function resolveQueuedRound(){
+ const match=state.match;if(!match||match.finished||state.resolving||!allActionsSubmitted(match))return;
+ const order=getResolutionOrder(match);let index=0;
+ state.resolving=true;state.turnMask=false;state.currentActorId=null;state.battleFx=null;render();
+ const resolveNext=()=>{
+  if(state.match!==match)return;
+  if(match.finished||index>=order.length){
+   state.resolving=false;state.currentActorId=null;state.battleFx=null;
+   if(!match.finished)advanceTurn(match);
+   state.turnMask=match.mode!=='1vsIA';render();
+   if(!match.finished)prepareTurn();
+   return;
+  }
+  const entry=order[index++],attacker=entry.player,action=entry.action;
+  if(attacker.fainted){setTimeout(resolveNext,180);return;}
+  const targets=livingOpponents(match,attacker);
+  if(!targets.length){checkFinished(match);setTimeout(resolveNext,180);return;}
+  const requested=getPlayer(match,action.targetId);
+  const target=requested&&!requested.fainted?requested:targets[0];
+  const roll=1+Math.floor(Math.random()*20);
+  const result=executeAttack(match,attacker.id,action.moveIndex,target.id,roll);
+  if(!result.ok){setTimeout(resolveNext,180);return;}
+  state.currentActorId=attacker.id;
+  state.battleFx={kind:moveFxKind(result),attackerId:result.attacker.id,targetId:result.target.id,label:battleFxLabel(result),attackName:result.move.name,roll:result.roll,key:Date.now()+index};
+  playMoveSound(attacker,result);render();setTimeout(resolveNext,1250);
+ };
+ resolveNext();
 }
 function battleFxLabel(result){
- const effect=result.move?.effect;
- if(effect?.type==='heal')return `+${effect.amount||6} HP`;
- if(effect?.type==='shield')return `+${effect.amount||6} ESCUDO`;
- if(effect?.type==='mana')return `+${effect.amount||3} MANA`;
- return `-${result.damage} HP`;
+ const effect=result.move?.effect,dice=`D20 ${result.roll}/20${result.critical?' · CRÍTICO':''}`;
+ if(effect?.type==='heal')return `+${effect.amount||6} HP · ${dice}`;
+ if(effect?.type==='shield')return `+${effect.amount||6} ESCUDO · ${dice}`;
+ if(effect?.type==='mana')return `+${effect.amount||3} MANA · ${dice}`;
+ return `-${result.damage} HP · ${dice}`;
 }
 function moveFxKind(result){
  const effect=result.move?.effect?.type;
- if(effect==='heal')return 'heal';if(effect==='shield'||effect==='reduce'||effect==='reflect')return 'shield';
- const t=String(result.attacker?.card?.type1||'').toLowerCase();
- if(t.includes('fogo'))return 'fire';if(t.includes('água'))return 'water';if(t.includes('elétrico'))return 'electric';if(t.includes('psíquico'))return 'psychic';if(t.includes('planta'))return 'plant';if(t.includes('fantasma')||t.includes('sombrio'))return 'ghost';return 'hit';
+ if(effect==='heal')return 'heal';if(['shield','reduce','reflect'].includes(effect))return 'shield';
+ const phrase=`${result.move?.name||''} ${result.move?.description||''}`.toLowerCase();
+ const rules=[
+  [/lança-chamas|chama|fogo|brasa|brasas|roda de fogo|chama cruzada|fogo azul/,'fire'],
+  [/hidro|água|agua|jato d.?água|cascata|surf|bolha|redemoinho|hidrobomba/,'water'],
+  [/raio|choque|faísca|faisca|relâmpago|relampago|volt|tri-ataque digital/,'electric'],
+  [/folha|vinha|cipó|cipo|pétala|petala|floral|solar|drenagem/,'plant'],
+  [/gelo|nevasca|glacial|congel|sopro gelado|beijo gelado/,'ice'],
+  [/terremoto|pedra|roch|osso|martelo|pinça|pinca|lama|contra-ataque/,'rock'],
+  [/tornado|furacão|furacao|vendaval|asa|mergulho aéreo|aeroblasto|vento/,'wind'],
+  [/psíqu|psiqu|mental|colapso|confusão|confusao|telecinético|telecinetico|força lunar/,'psychic'],
+  [/sombr|fantasm|névoa|nevoa|susto|noturno|noturna/,'ghost'],
+  [/venen|lodo|ferrão|ferrao|bomba de lodo/,'poison'],
+  [/dragão|dragao|dragon|garra do dragão|pulso do dragão/,'dragon'],
+  [/soco|golpe|garra|cauda|martelada|bicada|mordida|investida|pancada|combo|impacto/,'physical']
+ ];
+ for(const [pattern,kind] of rules)if(pattern.test(phrase))return kind;
+ const t=`${result.attacker?.card?.type1||''} ${result.attacker?.card?.type2||''}`.toLowerCase();
+ if(t.includes('fogo'))return 'fire';if(t.includes('água')||t.includes('agua'))return 'water';
+ if(t.includes('elétrico')||t.includes('eletrico'))return 'electric';if(t.includes('planta'))return 'plant';
+ if(t.includes('gelo'))return 'ice';if(t.includes('pedra')||t.includes('terra'))return 'rock';
+ if(t.includes('voador'))return 'wind';if(t.includes('psíquico')||t.includes('psiquico'))return 'psychic';
+ if(t.includes('fantasma')||t.includes('sombrio'))return 'ghost';if(t.includes('veneno'))return 'poison';
+ if(t.includes('dragão')||t.includes('dragao'))return 'dragon';return 'physical';
 }
 function playMoveSound(attacker,result){
  const effect=result.move?.effect?.type;
  if(effect==='heal'){audio.play('heal');return;}
  if(['shield','reduce','reflect'].includes(effect)){audio.play('shield');return;}
- const t=String(attacker.card?.type1||'').toLowerCase();
- if(t.includes('fogo'))audio.play('fire');else if(t.includes('água'))audio.play('water');else if(t.includes('elétrico'))audio.play('electric');else if(t.includes('psíquico'))audio.play('psychic');else if(t.includes('planta'))audio.play('plant');else if(t.includes('fantasma')||t.includes('sombrio'))audio.play('ghost');else audio.play('attack');
- if(result.target?.fainted) setTimeout(()=>audio.play('faint'),280);else setTimeout(()=>audio.play('hit'),90);
+ const soundByFx={fire:'fire',water:'water',electric:'electric',plant:'plant',ice:'ice',rock:'rock',wind:'wind',psychic:'psychic',ghost:'ghost',poison:'poison',dragon:'dragon',physical:'attack'};
+ audio.play(soundByFx[moveFxKind(result)]||'attack');
+ if(result.target?.fainted)setTimeout(()=>audio.play('faint'),280);else setTimeout(()=>audio.play('hit'),90);
  if(effect==='poison'||effect==='burn'||effect==='paralysis')setTimeout(()=>audio.play('status'),180);
-}
-function clearBattleFxLater(){
- const key=state.battleFx?.key;if(!key)return;
- setTimeout(()=>{if(state.battleFx?.key===key){state.battleFx=null;if(state.view==='battle')render();}},1050);
 }
 function enterAdmin(){state.view='admin';state.adminFormOpen=false;state.editingId=null;state.pendingImage=null;render();}
 function buildEffect(type){
@@ -273,7 +339,7 @@ function buildEffect(type){
 function handleAdminSubmit(form){
  const fd=new FormData(form);const old=state.editingId?findCard(state.editingId):null;
  const attack=(n)=>({name:String(fd.get(`a${n}name`)).trim(),damage:Number(fd.get(`a${n}damage`)),cost:Number(fd.get(`a${n}cost`)),category:String(fd.get(`a${n}category`)||'special'),description:String(fd.get(`a${n}description`)||''),effect:buildEffect(String(fd.get(`a${n}effect`)||''))});
- const card={id:old?old.id:`custom-${Date.now()}`,name:String(fd.get('name')).trim(),type1:String(fd.get('type1')),type2:String(fd.get('type2')||''),hp:Number(fd.get('hp')),atk:Number(fd.get('atk')||0),def:Number(fd.get('def')||0),spAtk:Number(fd.get('spAtk')||0),spDef:Number(fd.get('spDef')||0),image:state.pendingImage!==null?state.pendingImage:(old?.image||''),spriteIndex:old?.spriteIndex,attacks:[attack(1),attack(2)],createdAt:old?.createdAt||Date.now()};
+ const card={id:old?old.id:`custom-${Date.now()}`,name:String(fd.get('name')).trim(),type1:String(fd.get('type1')),type2:String(fd.get('type2')||''),hp:Number(fd.get('hp')),speed:Number(fd.get('speed')||getPokemonSpeed(old||{})),atk:Number(fd.get('atk')||0),def:Number(fd.get('def')||0),spAtk:Number(fd.get('spAtk')||0),spDef:Number(fd.get('spDef')||0),image:state.pendingImage!==null?state.pendingImage:(old?.image||''),spriteIndex:old?.spriteIndex,attacks:[attack(1),attack(2)],createdAt:old?.createdAt||Date.now()};
  if(!card.name||card.hp<=0||card.attacks.some(a=>!a.name||a.damage<0||a.cost<0||a.cost>20)){toast('Confira os campos obrigatórios e os valores dos ataques.','error');return;}
  saveCard(card).then(async()=>{await updateCards();state.adminFormOpen=false;state.editingId=null;state.pendingImage=null;state.adminSearch='';render();toast(old?'Carta atualizada com sucesso.':'Pokémon cadastrado com sucesso.','success');}).catch(e=>toast(e.message,'error'));
 }
@@ -295,8 +361,8 @@ app.addEventListener('click',event=>{
   else if(action==='pick-card'){state.pendingCardId=actionEl.dataset.cardId;renderSelectionAfterPick();}
   else if(action==='confirm-selection')confirmSelection();
   else if(action==='cancel-selection'){state.view='setup';state.participants=[];render();}
-  else if(action==='turn-ready'){state.turnMask=false;render();if(currentPlayer(state.match)?.isAI)prepareTurn();}
-  else if(action==='attack')playAttack(Number(actionEl.dataset.index));
+  else if(action==='turn-ready'){state.turnMask=false;render();}
+  else if(action==='attack')queuePlayerAttack(Number(actionEl.dataset.index));
   else if(action==='replay'){state.view='selection';state.selectionIndex=state.participants.findIndex(p=>!p.isAI);state.participants=state.participants.map(p=>({...p,card:null}));state.pendingCardId=null;render();}
   else if(action==='surrender'){const p=currentPlayer(state.match);const losing=p.team;state.match.players.filter(x=>x.team===losing&&!x.fainted).forEach(x=>{x.hp=0;x.fainted=true;});checkFinished(state.match);render();}
   else if(action==='close-modal')clearModal();
@@ -314,7 +380,7 @@ function renderSelectionAfterPick(){
  // Atualiza o painel de prévia sem recriar a grade inteira, preservando posição e filtros.
  document.querySelectorAll('.pokemon-card').forEach(el=>el.classList.toggle('selected',el.dataset.cardId===String(state.pendingCardId)));
  const side=document.querySelector('.selection-side');if(side){
-  side.innerHTML=`<span class="eyebrow">ESCOLHA ATUAL</span><h3>${esc(participant?.name||'Treinador')}</h3><div class="selection-preview">${chosen?cardImage(chosen,true):'<span class="muted">Selecione uma carta</span>'}</div>${chosen?`<strong>${esc(chosen.name)}</strong><div class="type-row" style="padding:8px 0">${typeChips(chosen)}</div><div class="stat-line"><span>Vida máxima</span><b>${chosen.hp} HP</b></div><div class="attack-mini"><span>${esc(chosen.attacks[0].name)}</span><b>${chosen.attacks[0].damage}</b></div><div class="attack-mini"><span>${esc(chosen.attacks[1].name)}</span><b>${chosen.attacks[1].damage}</b></div>`:'<p class="select-hint">Clique em uma carta para ver os detalhes.</p>'}<button class="btn btn-primary" data-action="confirm-selection" ${!chosen?'disabled':''}>${state.selectionIndex>=state.participants.filter(p=>!p.isAI).length-1?'CONFIRMAR E INICIAR':'CONFIRMAR ESCOLHA'}</button><button class="btn btn-ghost" data-action="cancel-selection">Voltar</button><p class="select-hint">${state.selectionIndex+1} de ${state.participants.filter(p=>!p.isAI).length} escolhas humanas</p>`;
+  side.innerHTML=`<span class="eyebrow">ESCOLHA ATUAL</span><h3>${esc(participant?.name||'Treinador')}</h3><div class="selection-preview">${chosen?cardImage(chosen,true):'<span class="muted">Selecione uma carta</span>'}</div>${chosen?`<strong>${esc(chosen.name)}</strong><div class="type-row" style="padding:8px 0">${typeChips(chosen)}</div><div class="stat-line"><span>Vida máxima</span><b>${chosen.hp} HP</b></div><div class="stat-line"><span>Velocidade</span><b>${getPokemonSpeed(chosen)}</b></div><div class="attack-mini"><span>${esc(chosen.attacks[0].name)}</span><b>${chosen.attacks[0].damage}</b></div><div class="attack-mini"><span>${esc(chosen.attacks[1].name)}</span><b>${chosen.attacks[1].damage}</b></div>`:'<p class="select-hint">Clique em uma carta para ver os detalhes.</p>'}<button class="btn btn-primary" data-action="confirm-selection" ${!chosen?'disabled':''}>${state.selectionIndex>=state.participants.filter(p=>!p.isAI).length-1?'CONFIRMAR E INICIAR':'CONFIRMAR ESCOLHA'}</button><button class="btn btn-ghost" data-action="cancel-selection">Voltar</button><p class="select-hint">${state.selectionIndex+1} de ${state.participants.filter(p=>!p.isAI).length} escolhas humanas</p>`;
  }
 }
 app.addEventListener('submit',event=>{
