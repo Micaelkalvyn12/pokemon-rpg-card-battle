@@ -59,45 +59,48 @@ export async function seedCards(){
       tx.objectStore('meta').put({key:'seeded-default-cards',value:true});
       tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
     });
-    return true;
-  }
-
-  if(!marker){
+  } else if(!marker) {
     await transaction('meta','readwrite',s=>s.put({key:'seeded-default-cards',value:true}));
   }
 
-  // Migração da versão anterior: adiciona as novas cartas do PDF e os índices
-  // da folha de sprites sem apagar cartas criadas ou imagens carregadas pelo usuário.
-  const artMarker = await transaction('meta','readonly',s=>s.get('pdf-card-art-v1'));
-  if(!artMarker){
-    const existing = await getCards();
-    const byId = new Map(existing.map(card=>[String(card.id),card]));
-    const legacyHp = {'4':58,'10':68,'18':61,'25':68,'41':63};
-    const db=await openDB();
-    await new Promise((resolve,reject)=>{
-      const tx=db.transaction(['cards','meta'],'readwrite');
-      const store=tx.objectStore('cards');
-      DEFAULT_CARDS.forEach(def=>{
-        const old=byId.get(String(def.id));
-        if(!old){store.put(def);return;}
-        const updated={...old};
-        if(def.spriteIndex!==undefined && updated.spriteIndex===undefined){
-          updated.spriteIndex=def.spriteIndex;
-        }
-        // Corrige apenas os HP padrão antigos que agora têm valor impresso na arte.
-        if(legacyHp[String(def.id)]!==undefined && Number(updated.hp)===legacyHp[String(def.id)]){
-          updated.hp=def.hp;
-        }
-        if(String(def.id)==='22' && updated.name==='Starmie') updated.name='Starmine';
-        if(updated!==old) store.put(updated);
-      });
-      tx.objectStore('meta').put({key:'pdf-card-art-v1',value:true});
-      tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+  // Migração segura e repetível: garante as cartas padrão e repara índices
+  // de arte ausentes mesmo em navegadores que já tenham um marcador antigo.
+  // Não substitui imagens próprias nem atributos personalizados do jogador.
+  const existing = await getCards();
+  const byId = new Map(existing.map(card=>[String(card.id),card]));
+  const legacyHp = {'4':58,'10':68,'18':61,'25':68,'41':63};
+  const db=await openDB();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction(['cards','meta'],'readwrite');
+    const store=tx.objectStore('cards');
+    DEFAULT_CARDS.forEach(def=>{
+      const old=byId.get(String(def.id));
+      if(!old){
+        store.put(def);
+        return;
+      }
+      const updated={...old};
+      let changed=false;
+      if(def.spriteIndex!==undefined && Number(updated.spriteIndex)!==Number(def.spriteIndex)){
+        updated.spriteIndex=def.spriteIndex;
+        changed=true;
+      }
+      // Corrige HP antigo somente quando ainda conserva o valor legado conhecido.
+      if(legacyHp[String(def.id)]!==undefined && Number(updated.hp)===legacyHp[String(def.id)]){
+        updated.hp=def.hp;
+        changed=true;
+      }
+      if(String(def.id)==='22' && updated.name==='Starmie'){
+        updated.name='Starmine';
+        changed=true;
+      }
+      if(changed) store.put(updated);
     });
-  }
-  return false;
+    tx.objectStore('meta').put({key:'pdf-card-art-v2',value:true});
+    tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);
+  });
+  return true;
 }
-
 export async function importCards(cards,{overwrite=false}={}){
   if(!Array.isArray(cards)) throw new Error('O arquivo não contém uma lista de cartas.');
   const existing=await getCards();
