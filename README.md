@@ -90,3 +90,10 @@ A V1.2 usa `assets/cards-sprite.webp` e `assets/battle-sprite.webp`, folhas de s
 ## Áudio
 
 `js/audio.js` cria uma trilha ambiente e efeitos sonoros originais por Web Audio API. O navegador exige uma interação antes de liberar o áudio; use o botão `♫` no cabeçalho para ligar/desligar música e efeitos.
+
+## Atualização V1.3 — artes das cartas
+
+- A folha de artes em `assets/cards-sprite.webp` é vinculada às cartas padrão.
+- A migração do banco local repara índices de ilustração ausentes sem apagar imagens ou atributos personalizados.
+- O menu inicial exibe uma prévia da coleção ilustrada.
+- Os arquivos CSS e JavaScript usam versão na URL para evitar cache antigo.
