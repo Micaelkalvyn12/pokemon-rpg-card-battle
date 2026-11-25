@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -33,6 +34,23 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
+      - name: Wait for Pages artifact indexing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          for attempt in $(seq 1 20); do
+            artifact_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" --jq '.artifacts[] | select(.name == "github-pages") | .id' | head -n 1)"
+            if [[ -n "$artifact_id" ]]; then
+              echo "Pages artifact is ready: $artifact_id"
+              exit 0
+            fi
+            echo "Waiting for GitHub to index the Pages artifact ($attempt/20)..."
+            sleep 2
+          done
+          echo "::error::Pages artifact was not indexed in time."
+          exit 1
 
       - name: Deploy to GitHub Pages
         id: deployment
