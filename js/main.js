@@ -57,6 +57,13 @@ function renderHome(){return `
     <button class="mode-card" data-action="start-setup" data-mode="1vsIA"><span class="mode-icon">✧</span><h3>1 VS IA</h3><p>Enfrente a inteligência artificial e escolha entre três níveis de dificuldade.</p><span class="arrow">↗</span></button>
     <button class="mode-card" data-action="start-setup" data-mode="team"><span class="mode-icon">♟</span><h3>BATALHA EM EQUIPE</h3><p>Organize duas equipes de treinadores e enfrente uma batalha de até cinco participantes.</p><span class="arrow">↗</span></button>
   </section>
+  <section class="collection-showcase">
+    <div class="collection-showcase-heading">
+      <div><span class="eyebrow">ARTES DAS CARTAS</span><h2>COLEÇÃO ILUSTRADA</h2><p>As ilustrações das cartas fazem parte da seleção de Pokémon e da arena de batalha.</p></div>
+      <span class="collection-count">${state.cards.filter(c=>c.spriteIndex!==undefined).length} artes vinculadas</span>
+    </div>
+    <div class="collection-art-grid">${state.cards.filter(c=>c.spriteIndex!==undefined).slice(0,4).map(c=>'<article class="collection-art-card"><div class="collection-art-image">'+cardImage(c,true)+'</div><div class="collection-art-caption"><strong>'+esc(c.name)+'</strong><span>'+typeChips(c)+'</span></div></article>').join('')}</div>
+  </section>
   <section class="panel home-bottom"><div><strong>✦ Biblioteca de cartas</strong><br><span>${state.cards.length} Pokémon disponíveis · imagens e atributos editáveis</span></div><div><button class="btn btn-secondary" data-action="open-admin">⚙ GERENCIAR CARTAS</button></div></section>
   `;}
 function renderSetup(){
