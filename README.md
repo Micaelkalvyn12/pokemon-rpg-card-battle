@@ -97,3 +97,14 @@ A V1.2 usa `assets/cards-sprite.webp` e `assets/battle-sprite.webp`, folhas de s
 - A migração do banco local repara índices de ilustração ausentes sem apagar imagens ou atributos personalizados.
 - O menu inicial exibe uma prévia da coleção ilustrada.
 - Os arquivos CSS e JavaScript usam versão na URL para evitar cache antigo.
+
+
+## Versão 1.4 — Combate RPG
+
+- Rodadas simultâneas: todos os participantes escolhem o ataque antes da resolução.
+- Iniciativa pela velocidade do Pokémon; empates recebem desempate aleatório.
+- Teste de ataque com dado de 20 lados (D20): resultados maiores causam mais dano e 20 é crítico.
+- Animações e efeitos sonoros por categoria do golpe.
+- Trilha ambiente mais presente e interface renovada em estilo RPG de fantasia.
+- Pokémon sem ilustração disponível são ocultados da seleção e da escolha automática da IA.
+- Velocidade editável no painel de gerenciamento de cartas.
