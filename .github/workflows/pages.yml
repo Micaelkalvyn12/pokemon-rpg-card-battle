@@ -27,7 +27,7 @@ jobs:
       - name: Extract game files
         run: |
           mkdir -p site /tmp/pokemon-rpg
-          cat pokemon-rpg-v1.tar.xz.b64.part* | base64 --decode > /tmp/pokemon-rpg.tar.xz
+          base64 --decode pokemon-rpg-v1.tar.xz.b64 > /tmp/pokemon-rpg.tar.xz
           tar -xJf /tmp/pokemon-rpg.tar.xz -C /tmp/pokemon-rpg
           cp -R /tmp/pokemon-rpg/pokemon-rpg/. site/
           touch site/.nojekyll
