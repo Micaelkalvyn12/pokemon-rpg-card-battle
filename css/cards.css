@@ -15,3 +15,20 @@
 .selection-preview{aspect-ratio:144 / 204;min-height:0;height:auto;max-height:240px;width:min(100%,144px);margin:0 auto 14px;padding:0;background:#0b1422;border:1px dashed #344862;display:grid;place-items:center;overflow:hidden}
 .selection-preview .card-sprite,.selection-preview .uploaded-card-image{width:100%;height:100%;object-fit:contain}
 @media(max-width:450px){.pokemon-card.artwork-card{padding:5px}.artwork-caption strong{font-size:12px}.artwork-caption .type-chip{font-size:6px;padding:3px 5px}}
+
+
+/* Prévia das cartas ilustradas no menu inicial. */
+.collection-showcase{margin-top:24px;padding:22px;border:1px solid #385172;border-radius:22px;background:linear-gradient(145deg,#16263e,#0d1727);box-shadow:0 18px 48px #0004}
+.collection-showcase-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:16px}
+.collection-showcase-heading h2{font:900 27px 'Barlow Condensed';letter-spacing:.04em;margin:6px 0 4px}
+.collection-showcase-heading p{font-size:11px;line-height:1.5;color:#9db0c9;margin:0;max-width:520px}
+.collection-count{white-space:nowrap;color:#b9ddff;background:#213b59;border:1px solid #42658c;border-radius:30px;padding:7px 11px;font-size:10px;font-weight:800}
+.collection-art-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.collection-art-card{min-width:0;padding:7px;border:1px solid #425a79;border-radius:14px;background:#0a1423}
+.collection-art-image{width:100%;aspect-ratio:144 / 204;overflow:hidden;border-radius:9px;background:#111c2d}
+.collection-art-image .card-sprite{display:block;width:100%;height:100%;background-repeat:no-repeat;background-size:700% 900%}
+.collection-art-caption{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:8px 2px 2px}
+.collection-art-caption strong{font:800 14px 'Barlow Condensed';white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.collection-art-caption .type-row{padding:0;gap:3px}
+.collection-art-caption .type-chip{font-size:6px;padding:3px 5px}
+@media(max-width:650px){.collection-showcase{padding:14px}.collection-showcase-heading{align-items:flex-start;flex-direction:column}.collection-art-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
