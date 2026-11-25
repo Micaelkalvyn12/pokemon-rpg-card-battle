@@ -21,8 +21,8 @@ class GameAudio {
       this.master=this.context.createGain();
       this.musicBus=this.context.createGain();
       this.sfxBus=this.context.createGain();
-      this.master.gain.value=this.enabled?0.78:0;
-      this.musicBus.gain.value=0.32;
+      this.master.gain.value=this.enabled?0.85:0;
+      this.musicBus.gain.value=0.48;
       this.sfxBus.gain.value=0.82;
       this.musicBus.connect(this.master);
       this.sfxBus.connect(this.master);
@@ -46,7 +46,7 @@ class GameAudio {
     if(this.master && this.context){
       const now=this.context.currentTime;
       this.master.gain.cancelScheduledValues(now);
-      this.master.gain.setTargetAtTime(this.enabled?0.78:0,now,0.08);
+      this.master.gain.setTargetAtTime(this.enabled?0.85:0,now,0.08);
     }
     if(this.enabled)this.unlock();
     return this.enabled;
@@ -62,12 +62,13 @@ class GameAudio {
       const seq=this.scene==='battle'?battle:home;
       const freq=seq[this.note%seq.length];
       this.note++;
-      this.tone(freq,this.scene==='battle'?0.34:0.48,'triangle',0.075,this.musicBus,1.015);
+      this.tone(freq,this.scene==='battle'?0.38:0.52,'triangle',this.scene==='battle'?0.115:0.095,this.musicBus,1.015);
+      if(this.note%2===0)this.tone(freq*2,this.scene==='battle'?0.20:0.24,'sine',0.025,this.musicBus,0.995);
       if(this.note%4===0){
         const bass=this.scene==='battle'?[98,110,130.81,110]:[130.81,146.83,164.81,146.83];
-        this.tone(bass[(this.note/4|0)%4],0.72,'sine',0.035,this.musicBus,0.997);
+        this.tone(bass[(this.note/4|0)%4],0.78,'sine',0.055,this.musicBus,0.997);
       }
-    },this.scene==='battle'?560:820);
+    },this.scene==='battle'?480:760);
   }
 
   tone(frequency,duration=0.12,wave='sine',volume=0.12,bus=this.sfxBus,slide=1){
@@ -116,7 +117,13 @@ class GameAudio {
       ghost:[[260,.18,'sawtooth',.06,.58],[440,.2,'sine',.05,.76]],
       hit:[[110,.16,'sawtooth',.08,.62]],
       shield:[[780,.1,'triangle',.06,1.2],[1046,.17,'sine',.045,.9]],
-      menu:[[659,.08,'sine',.035],[784,.1,'sine',.04]]
+      menu:[[659,.08,'sine',.035],[784,.1,'sine',.04]],
+      ice:[[880,.12,'sine',.07,1.25],[1320,.18,'triangle',.05,.78]],
+      rock:[[95,.22,'sawtooth',.08,.72],[160,.16,'triangle',.06,.8]],
+      wind:[[480,.2,'sine',.06,1.9],[720,.16,'triangle',.045,.7]],
+      poison:[[260,.12,'sawtooth',.06,.72],[390,.18,'sine',.055,.8]],
+      dragon:[[110,.2,'sawtooth',.07,1.8],[660,.22,'triangle',.065,.62]],
+      physical:[[180,.09,'square',.07,.7],[360,.15,'sawtooth',.06,.8]]
     };
     if(kind==='hit'){this.noise(.12,.14,750);}
     if(kind==='fire')this.noise(.16,.075,1100);
