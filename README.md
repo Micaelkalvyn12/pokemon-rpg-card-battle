@@ -16,3 +16,8 @@ O pacote completo de desenvolvimento está em `pokemon-rpg-v1.zip.b64` (arquivo 
 - As batalhas são locais no mesmo dispositivo; esta versão não possui multiplayer pela internet.
 - Cartas e imagens cadastradas no painel ficam no IndexedDB do navegador local e não são compartilhadas entre visitantes.
 - A senha do painel administrativo está no código do cliente e é apenas uma barreira visual, não uma autenticação segura.
+
+
+## Publicação automática
+
+Atualizações na branch `main` iniciam o deploy do GitHub Pages pelo workflow `Publish Pokémon RPG`.
