@@ -89,3 +89,7 @@
 @keyframes vfx-heal{0%{transform:translate(0,30px) scale(.2) rotate(-30deg);opacity:0}40%{opacity:1;transform:translate(0,-20px) scale(1.35) rotate(25deg)}100%{transform:translate(0,-90px) scale(.4) rotate(80deg);opacity:0}}
 @media(max-width:550px){.dice-guide{align-items:flex-start}.dice-icon{width:36px;height:36px;flex-basis:36px}.battle-attack-caption{max-width:92%;white-space:normal;text-align:center;font-size:9px}.attack-vfx:before{font-size:48px}}
 
+
+
+.combat-speed{white-space:nowrap;padding:5px 7px;border:1px solid #a78a586b;border-radius:8px;background:#78603a22;color:#f1d18c;font-size:8px;font-weight:900;letter-spacing:.08em}
+@media(max-width:550px){.combat-speed{font-size:7px;padding:4px 5px}}
