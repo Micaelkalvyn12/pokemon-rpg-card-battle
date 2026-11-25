@@ -1,0 +1,7 @@
+{
+  "name": "pokemon-rpg-card-battle",
+  "version": "1.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Jogo local de batalha Pokémon por cartas"
+}

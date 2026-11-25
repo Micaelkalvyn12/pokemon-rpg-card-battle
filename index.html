@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090d18">
+  <meta name="description" content="Pokémon RPG: Card Battle — jogo local de batalhas por cartas.">
+  <title>Pokémon RPG — Card Battle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/menu.css">
+  <link rel="stylesheet" href="css/cards.css">
+  <link rel="stylesheet" href="css/battle.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <button class="brand" id="brand-home" aria-label="Voltar ao início"><span class="brand-mark">P</span><span>POKÉMON <b>RPG</b><small>CARD BATTLE · V1.2</small></span></button>
+    <div class="topbar-right"><span class="local-pill"><i></i> ACESSO WEB · BATALHAS LOCAIS</span><button class="icon-btn" id="sound-toggle" data-enabled="true" title="Música e efeitos ativados" aria-label="Ativar ou desativar música e efeitos">♫</button></div>
+  </header>
+  <main id="app" class="app-shell" aria-live="polite"></main>
+  <div id="toast-region" class="toast-region" aria-live="assertive"></div>
+  <div id="modal-root"></div>
+  <footer class="footer-note">Projeto independente de fã · Dados salvos neste navegador · V1.2</footer>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
